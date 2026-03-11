@@ -82,8 +82,13 @@ def extract_contractor_name(text: str) -> str:
 
 
 def extract_contractor_document(text: str) -> str:
-    cedula_token = r"(?:No\.?|N[°º]\.?|Número|Num\.?|#)?"
-    cedula_number = r"([0-9][0-9\.\s]{4,}[0-9])"
+    cedula_token = r"(?:No\.?|No,?|N[°º]\.?|Número|Num\.?|#)?"
+    cedula_number = r"([0-9OIl][0-9OIl\.,\-\s]{4,}[0-9OIl])"
+
+    def clean_cedula(candidate: str) -> str:
+        normalized = candidate.translate(str.maketrans({"O": "0", "I": "1", "l": "1"}))
+        normalized = re.sub(r"[^0-9]", "", normalized)
+        return normalized
 
     # 1) Prioridad: cédula ubicada después de "por la otra / por el otro".
     m_context = re.search(
@@ -92,7 +97,7 @@ def extract_contractor_document(text: str) -> str:
         re.IGNORECASE | re.DOTALL,
     )
     if m_context:
-        return re.sub(r"\s+", "", m_context.group(1)).strip(" .,:;-)\n\t")
+        return clean_cedula(m_context.group(1))
 
     # 2) Alternativa: capturar todas las cédulas encontradas y usar la última (suele ser la del contratista).
     matches = re.findall(
@@ -101,7 +106,7 @@ def extract_contractor_document(text: str) -> str:
         re.IGNORECASE | re.DOTALL,
     )
     if matches:
-        return re.sub(r"\s+", "", matches[-1]).strip(" .,:;-)\n\t")
+        return clean_cedula(matches[-1])
 
     # 3) Fallback más laxo para formatos menos estructurados.
     fallback_patterns = [
@@ -110,7 +115,16 @@ def extract_contractor_document(text: str) -> str:
     ]
     m = search_first(fallback_patterns, text)
     if m:
-        return re.sub(r"\s+", "", m.group(1)).strip(" .,:;-)\n\t")
+        return clean_cedula(m.group(1))
+
+    # 4) Fallback contextual: valor más cercano al bloque del contratista.
+    m_contratista = re.search(
+        rf"EL\s+CONTRATISTA.*?(?:c[ée]dula\s+de\s+ciudadan[íi]a\s*{cedula_token}\s*{cedula_number})",
+        text,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if m_contratista:
+        return clean_cedula(m_contratista.group(1))
     return ""
 
 
