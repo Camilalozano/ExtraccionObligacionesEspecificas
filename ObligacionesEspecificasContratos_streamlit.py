@@ -75,7 +75,9 @@ def extract_contractor_name(text: str) -> str:
     ]
     m = search_first(patterns, text)
     if m:
-        return re.sub(r"\s+", " ", m.group(1)).strip(" ,.;:\n\t")
+        contractor_name = re.sub(r"\s+", " ", m.group(1)).strip(" ,.;:\n\t")
+        contractor_name = re.sub(r"^la\s+tecnolog[íi]a\s+y\s+", "", contractor_name, flags=re.IGNORECASE)
+        return contractor_name
     return ""
 
 
