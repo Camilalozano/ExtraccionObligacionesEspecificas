@@ -82,8 +82,8 @@ def extract_contractor_name(text: str) -> str:
 
 
 def extract_contractor_document(text: str) -> str:
-    cedula_token = r"(?:No\.?|No,?|N[°º]\.?|Número|Num\.?|#)?"
-    cedula_number = r"([0-9OIl][0-9OIl\.,\-\s]{4,}[0-9OIl])"
+    cedula_token = r"(?:No\.?|No,?|N[°º]\.?|Nro\.?|Número|Num\.?|#)?"
+    cedula_number = r"([0-9OIl][0-9OIl\.,/\-\s]{4,}[0-9OIl])"
 
     def clean_cedula(candidate: str) -> str:
         normalized = candidate.translate(str.maketrans({"O": "0", "I": "1", "l": "1"}))
