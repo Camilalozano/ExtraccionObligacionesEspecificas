@@ -82,14 +82,35 @@ def extract_contractor_name(text: str) -> str:
 
 
 def extract_contractor_document(text: str) -> str:
-    patterns = [
-        r"por la otra,.*?identificad[oa]\s+con\s+la\s+c[ée]dula\s+de\s+ciudadan[íi]a\s+No\.\s*([0-9\.]+)",
-        r"EL CONTRATISTA.*?c[ée]dula\s+de\s+ciudadan[íi]a\s+No\.\s*([0-9\.]+)",
-        r"identificad[oa]\s+con\s+la\s+c[ée]dula\s+de\s+ciudadan[íi]a\s+No\.\s*([0-9\.]+)\s+expedida",
+    cedula_token = r"(?:No\.?|N[°º]\.?|Número|Num\.?|#)?"
+    cedula_number = r"([0-9][0-9\.\s]{4,}[0-9])"
+
+    # 1) Prioridad: cédula ubicada después de "por la otra / por el otro".
+    m_context = re.search(
+        rf"por\s+la\s+(?:otra|el\s+otro).*?identificad[oa]\s+con\s+la\s+c[ée]dula\s+de\s+ciudadan[íi]a\s*{cedula_token}\s*{cedula_number}",
+        text,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if m_context:
+        return re.sub(r"\s+", "", m_context.group(1)).strip(" .,:;-)\n\t")
+
+    # 2) Alternativa: capturar todas las cédulas encontradas y usar la última (suele ser la del contratista).
+    matches = re.findall(
+        rf"identificad[oa]\s+con\s+la\s+c[ée]dula\s+de\s+ciudadan[íi]a\s*{cedula_token}\s*{cedula_number}",
+        text,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if matches:
+        return re.sub(r"\s+", "", matches[-1]).strip(" .,:;-)\n\t")
+
+    # 3) Fallback más laxo para formatos menos estructurados.
+    fallback_patterns = [
+        rf"EL\s+CONTRATISTA.*?c[ée]dula\s+de\s+ciudadan[íi]a\s*{cedula_token}\s*{cedula_number}",
+        rf"c[ée]dula\s+de\s+ciudadan[íi]a\s*{cedula_token}\s*{cedula_number}\s+expedida",
     ]
-    m = search_first(patterns, text)
+    m = search_first(fallback_patterns, text)
     if m:
-        return m.group(1).strip()
+        return re.sub(r"\s+", "", m.group(1)).strip(" .,:;-)\n\t")
     return ""
 
 
