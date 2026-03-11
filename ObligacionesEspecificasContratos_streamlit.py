@@ -84,6 +84,7 @@ def extract_contractor_name(text: str) -> str:
 def extract_contractor_document(text: str) -> str:
     cedula_token = r"(?:No\.?|No,?|N[°º]\.?|Nro\.?|Número|Num\.?|#)?"
     cedula_number = r"([0-9OIl][0-9OIl\.,/\-\s]{4,}[0-9OIl])"
+    id_intro = r"identificad[oa](?:\s*[,;:]\s*|\s+)con\s+la\s+c[ée]dula\s+de\s+ciudadan[íi]a"
 
     def clean_cedula(candidate: str) -> str:
         normalized = candidate.translate(str.maketrans({"O": "0", "I": "1", "l": "1"}))
@@ -92,7 +93,7 @@ def extract_contractor_document(text: str) -> str:
 
     # 1) Prioridad: cédula ubicada después de "por la otra / por el otro".
     m_context = re.search(
-        rf"por\s+la\s+(?:otra|el\s+otro).*?identificad[oa]\s+con\s+la\s+c[ée]dula\s+de\s+ciudadan[íi]a\s*{cedula_token}\s*{cedula_number}",
+        rf"por\s+la\s+(?:otra|el\s+otro).*?{id_intro}\s*{cedula_token}\s*{cedula_number}",
         text,
         re.IGNORECASE | re.DOTALL,
     )
@@ -101,7 +102,7 @@ def extract_contractor_document(text: str) -> str:
 
     # 2) Alternativa: capturar todas las cédulas encontradas y usar la última (suele ser la del contratista).
     matches = re.findall(
-        rf"identificad[oa]\s+con\s+la\s+c[ée]dula\s+de\s+ciudadan[íi]a\s*{cedula_token}\s*{cedula_number}",
+        rf"{id_intro}\s*{cedula_token}\s*{cedula_number}",
         text,
         re.IGNORECASE | re.DOTALL,
     )
