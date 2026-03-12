@@ -192,11 +192,13 @@ def process_single_pdf(pdf_bytes: bytes, filename: str) -> Dict:
     raw_text = extract_text_from_pdf_bytes(pdf_bytes)
     text = normalize_text(raw_text)
 
+    contractor_name = extract_contractor_name(text)
+
     result = {
         "archivo": Path(filename).name,
         "numero_contrato": extract_contract_number(text, filename),
-        "nombre_contratista": extract_contractor_name(text),
-        "numero_documento_contratista": extract_contractor_document(text),
+        "nombre_contratista": contractor_name,
+        "numero_documento_contratista": extract_contractor_document(text, contractor_name),
         "obligaciones_especificas": extract_obligaciones_especificas(text),
     }
     return result
