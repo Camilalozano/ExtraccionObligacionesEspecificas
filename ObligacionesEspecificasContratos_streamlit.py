@@ -81,51 +81,80 @@ def extract_contractor_name(text: str) -> str:
     return ""
 
 
-def extract_contractor_document(text: str) -> str:
-    cedula_token = r"(?:No\.?|No,?|N[°º]\.?|Nro\.?|Número|Num\.?|#)?"
-    cedula_number = r"([0-9OIl][0-9OIl\.,/\-\s]{4,}[0-9OIl])"
-    id_intro = r"identificad[oa](?:\s*[,;:]\s*|\s+)con\s+la\s+c[ée]dula\s+de\s+ciudadan[íi]a"
+def extract_contractor_document(text: str, contractor_name: str = "") -> str:
+    """
+    Extrae el número de documento del contratista con una estrategia más robusta:
+    1) Busca cerca del nombre del contratista.
+    2) Busca en el bloque 'por la otra'.
+    3) Busca patrones generales de cédula/CC.
+    """
 
     def clean_cedula(candidate: str) -> str:
-        normalized = candidate.translate(str.maketrans({"O": "0", "I": "1", "l": "1"}))
-        normalized = re.sub(r"[^0-9]", "", normalized)
-        return normalized
+        # Corrige posibles errores OCR comunes
+        candidate = candidate.translate(str.maketrans({
+            "O": "0",
+            "o": "0",
+            "I": "1",
+            "l": "1"
+        }))
+        # Deja solo dígitos
+        return re.sub(r"[^0-9]", "", candidate)
 
-    # 1) Prioridad: cédula ubicada después de "por la otra / por el otro".
-    m_context = re.search(
-        rf"por\s+la\s+(?:otra|el\s+otro).*?{id_intro}\s*{cedula_token}\s*{cedula_number}",
-        text,
-        re.IGNORECASE | re.DOTALL,
-    )
-    if m_context:
-        return clean_cedula(m_context.group(1))
+    def normalize_for_search(s: str) -> str:
+        s = s.replace("\xa0", " ")
+        s = re.sub(r"\s+", " ", s)
+        return s.strip()
 
-    # 2) Alternativa: capturar todas las cédulas encontradas y usar la última (suele ser la del contratista).
-    matches = re.findall(
-        rf"{id_intro}\s*{cedula_token}\s*{cedula_number}",
-        text,
-        re.IGNORECASE | re.DOTALL,
-    )
-    if matches:
-        return clean_cedula(matches[-1])
+    text_norm = normalize_for_search(text)
 
-    # 3) Fallback más laxo para formatos menos estructurados.
-    fallback_patterns = [
-        rf"EL\s+CONTRATISTA.*?c[ée]dula\s+de\s+ciudadan[íi]a\s*{cedula_token}\s*{cedula_number}",
-        rf"c[ée]dula\s+de\s+ciudadan[íi]a\s*{cedula_token}\s*{cedula_number}\s+expedida",
+    # Patrones flexibles para capturar números tipo 79.741.213 / 79741213 / 79 741 213
+    num_pattern = r"([0-9OIl][0-9OIl\.\,\-\s]{5,}[0-9OIl])"
+
+    id_patterns = [
+        rf"c[ée]dula\s+de\s+ciudadan[íi]a\s*(?:No\.?|N°|Nº|#|:)?\s*{num_pattern}",
+        rf"\bC\.?\s*C\.?\s*(?:No\.?|N°|Nº|#|:)?\s*{num_pattern}",
+        rf"\bc[ée]dula\s*(?:No\.?|N°|Nº|#|:)?\s*{num_pattern}",
+        rf"identificad[oa]\s*(?:\(a\))?\s+con\s+(?:la\s+)?c[ée]dula\s+de\s+ciudadan[íi]a\s*(?:No\.?|N°|Nº|#|:)?\s*{num_pattern}",
     ]
-    m = search_first(fallback_patterns, text)
-    if m:
-        return clean_cedula(m.group(1))
 
-    # 4) Fallback contextual: valor más cercano al bloque del contratista.
-    m_contratista = re.search(
-        rf"EL\s+CONTRATISTA.*?(?:c[ée]dula\s+de\s+ciudadan[íi]a\s*{cedula_token}\s*{cedula_number})",
-        text,
-        re.IGNORECASE | re.DOTALL,
+    # 1) Buscar cerca del nombre del contratista
+    if contractor_name:
+        contractor_name_esc = re.escape(normalize_for_search(contractor_name))
+        m_name = re.search(contractor_name_esc, text_norm, re.IGNORECASE)
+        if m_name:
+            start = max(0, m_name.start() - 80)
+            end = min(len(text_norm), m_name.end() + 250)
+            window = text_norm[start:end]
+
+            for pattern in id_patterns:
+                m = re.search(pattern, window, re.IGNORECASE)
+                if m:
+                    return clean_cedula(m.group(1))
+
+    # 2) Buscar en el bloque contextual de "por la otra"
+    m_other = re.search(
+        r"por\s+la\s+otra,?(.*?)(?:actuando\s+en\s+nombre\s+propio|qu[ií]en\s+declara|EL\s+CONTRATISTA)",
+        text_norm,
+        re.IGNORECASE | re.DOTALL
     )
-    if m_contratista:
-        return clean_cedula(m_contratista.group(1))
+    if m_other:
+        block = m_other.group(1)
+        for pattern in id_patterns:
+            m = re.search(pattern, block, re.IGNORECASE)
+            if m:
+                return clean_cedula(m.group(1))
+
+    # 3) Buscar en todo el texto y tomar la última coincidencia razonable
+    found = []
+    for pattern in id_patterns:
+        for m in re.finditer(pattern, text_norm, re.IGNORECASE):
+            value = clean_cedula(m.group(1))
+            if 6 <= len(value) <= 12:
+                found.append(value)
+
+    if found:
+        return found[-1]
+
     return ""
 
 
