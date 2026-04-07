@@ -81,6 +81,24 @@ def extract_contractor_name(text: str) -> str:
     return ""
 
 
+def extract_contract_type(text: str) -> str:
+    """
+    Extrae el tipo de contrato (ej. "PRESTACIÓN DE SERVICIOS PROFESIONALES")
+    desde el encabezado principal o desde menciones explícitas en el cuerpo.
+    """
+    patterns = [
+        r"CONTRATO\s+DE\s+([A-ZÁÉÍÓÚÑ\s]+?)\s+No\.?",
+        r"presente\s+contrato\s+de\s+([A-ZÁÉÍÓÚÑ\s]+?)(?:\s+el\s+cual|\s+que\s+se\s+regir[áa]|\s+conforme)",
+    ]
+
+    m = search_first(patterns, text)
+    if not m:
+        return ""
+
+    contract_type = re.sub(r"\s+", " ", m.group(1)).strip(" ,.;:\n\t")
+    return contract_type.upper()
+
+
 def extract_contractor_document(text: str, contractor_name: str = "") -> str:
     """
     Extrae el número de documento del contratista con una estrategia más robusta:
@@ -197,6 +215,7 @@ def process_single_pdf(pdf_bytes: bytes, filename: str) -> Dict:
     result = {
         "archivo": Path(filename).name,
         "numero_contrato": extract_contract_number(text, filename),
+        "Tipo_contrato": extract_contract_type(text),
         "nombre_contratista": contractor_name,
         "numero_documento_contratista": extract_contractor_document(text, contractor_name),
         "obligaciones_especificas": extract_obligaciones_especificas(text),
@@ -217,6 +236,7 @@ def process_zip(zip_bytes: bytes) -> List[Dict]:
                     {
                         "archivo": Path(name).name,
                         "numero_contrato": "",
+                        "Tipo_contrato": "",
                         "nombre_contratista": "",
                         "numero_documento_contratista": "",
                         "obligaciones_especificas": "",
@@ -235,7 +255,7 @@ st.set_page_config(page_title="Extractor de contratos desde ZIP", page_icon="�
 st.title("📄 Extractor de contratos desde archivo .zip")
 st.write(
     "Carga un archivo **.zip** que contenga contratos en **PDF**. "
-    "La app extrae por cada documento: número del contrato, nombre del contratista, "
+    "La app extrae por cada documento: número del contrato, tipo de contrato, nombre del contratista, "
     "número de documento y el bloque textual de **obligaciones específicas**."
 )
 
