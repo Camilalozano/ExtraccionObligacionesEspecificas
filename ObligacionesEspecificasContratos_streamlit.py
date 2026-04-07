@@ -257,11 +257,11 @@ def run_extraction(
         raise ValueError("No se encontraron PDFs dentro del archivo ZIP.")
 
     df = pd.DataFrame(data)
-    output_csv_path = input_zip_path.with_name("contratos_extraidos.csv")
-    df.to_csv(output_csv_path, index=False, encoding="utf-8-sig")
-    return output_csv_path
+    output_excel_path = input_zip_path.with_name("contratos_extraidos.xlsx")
+    df.to_excel(output_excel_path, index=False)
+    return output_excel_path
 
 
 if __name__ == "__main__":
     output_path = run_extraction()
-    print(f"Proceso finalizado. CSV generado automáticamente en: {output_path}")
+    print(f"Proceso finalizado. Excel generado automáticamente en: {output_path}")
