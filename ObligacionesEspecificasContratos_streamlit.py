@@ -281,6 +281,15 @@ with st.expander("⚙️ Requisitos y ejecución local"):
 pip install streamlit pypdf pandas
 streamlit run app_contratos_streamlit.py
 ```
+
+Para permitir cargas de archivos **.zip** mayores a 200 MB en Streamlit, crea el archivo
+`.streamlit/config.toml` con un límite más alto (ejemplo: 1024 MB):
+
+```toml
+[server]
+maxUploadSize = 1024
+maxMessageSize = 1024
+```
         """
     )
 
