@@ -1,12 +1,11 @@
 import io
-import json
 import re
+import sys
 import zipfile
 from pathlib import Path
 from typing import List, Dict, Optional
 
 import pandas as pd
-import streamlit as st
 from pypdf import PdfReader
 
 
@@ -246,78 +245,25 @@ def process_zip(zip_bytes: bytes) -> List[Dict]:
     return results
 
 
-# =========================
-# Streamlit UI
-# =========================
+def run_extraction(input_zip_path: Path) -> Path:
+    if not input_zip_path.exists() or not input_zip_path.is_file():
+        raise FileNotFoundError(f"No se encontró el archivo ZIP: {input_zip_path}")
 
-st.set_page_config(page_title="Extractor de contratos desde ZIP", page_icon="📄", layout="wide")
+    zip_bytes = input_zip_path.read_bytes()
+    data = process_zip(zip_bytes)
+    df = pd.DataFrame(data)
 
-st.title("📄 Extractor de contratos desde archivo .zip")
-st.write(
-    "Carga un archivo **.zip** que contenga contratos en **PDF**. "
-    "La app extrae por cada documento: número del contrato, tipo de contrato, nombre del contratista, "
-    "número de documento y el bloque textual de **obligaciones específicas**."
-)
+    output_excel_path = input_zip_path.parent / "contratos_extraidos.xlsx"
+    df.to_excel(output_excel_path, index=False)
+    return output_excel_path
 
-uploaded_zip = st.file_uploader("Sube el archivo .zip", type=["zip"])
 
-if uploaded_zip is not None:
-    zip_bytes = uploaded_zip.read()
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("❌ Debes pasar la ruta del archivo ZIP")
+        print("Ejemplo: python extractor_contratos.py archivo.zip")
+        raise SystemExit(1)
 
-    with st.spinner("Procesando contratos..."):
-        data = process_zip(zip_bytes)
-
-    st.success(f"Se procesaron {len(data)} archivo(s).")
-
-    if data:
-        df = pd.DataFrame(data)
-        st.subheader("Vista previa")
-        st.dataframe(df, use_container_width=True)
-
-        json_str = json.dumps(data, ensure_ascii=False, indent=2)
-
-        st.subheader("Vista previa del JSON")
-        st.code(json_str[:10000] + ("\n\n..." if len(json_str) > 10000 else ""), language="json")
-
-        st.download_button(
-            label="⬇️ Descargar JSON",
-            data=json_str.encode("utf-8"),
-            file_name="contratos_extraidos.json",
-            mime="application/json",
-        )
-
-        csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            label="⬇️ Descargar CSV",
-            data=csv_bytes,
-            file_name="contratos_extraidos.csv",
-            mime="text/csv",
-        )
-
-with st.expander("⚙️ Requisitos y ejecución local"):
-    st.markdown(
-        """
-```bash
-pip install streamlit pypdf pandas
-streamlit run app_contratos_streamlit.py
-```
-
-Para permitir cargas de archivos **.zip** mayores a 200 MB en Streamlit, crea el archivo
-`.streamlit/config.toml` con un límite más alto (ejemplo: 1024 MB):
-
-```toml
-[server]
-maxUploadSize = 1024
-maxMessageSize = 1024
-```
-        """
-    )
-
-with st.expander("📝 Notas"):
-    st.markdown(
-        """
-- La extracción depende del texto legible dentro del PDF. Si el PDF es una imagen escaneada, haría falta OCR.
-- El campo **obligaciones_especificas** se captura como bloque textual entre el encabezado de obligaciones específicas y la siguiente cláusula.
-- El código intenta ser flexible con pequeñas variaciones de formato entre contratos.
-        """
-    )
+    input_zip = Path(sys.argv[1])
+    output_excel = run_extraction(input_zip)
+    print(f"✅ Excel generado en: {output_excel}")
