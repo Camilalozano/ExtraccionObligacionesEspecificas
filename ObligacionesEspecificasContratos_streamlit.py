@@ -66,10 +66,12 @@ def extract_contract_number(text: str, filename: str = "") -> str:
 
 def extract_contractor_name(text: str) -> str:
     patterns = [
-        r"y por la otra,\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]+?),\s*mayor de edad, identificad[oa]",
-        r"celebrado entre .*? y\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]+?)\s+DIANA CONSUELO BLANCO GARZ[ÓO]N",
-        r"y\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]+?),\s*mayor de edad",
-        r"quien en adelante se denominar[áa]\s+EL CONTRATISTA.*?por la otra,\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]+?),",
+        r"CONTRATISTA\s*[:\-]\s*([A-ZÁÉÍÓÚÑa-záéíóúñ][A-ZÁÉÍÓÚÑa-záéíóúñ\s]{5,})",
+        r"nombre\s+del\s+contratista\s*[:\-]\s*([A-ZÁÉÍÓÚÑa-záéíóúñ][A-ZÁÉÍÓÚÑa-záéíóúñ\s]{5,})",
+        r"y por la otra,\s*([A-ZÁÉÍÓÚÑa-záéíóúñ][A-ZÁÉÍÓÚÑa-záéíóúñ\s]+?),\s*mayor de edad, identificad[oa]",
+        r"celebrado entre .*? y\s*([A-ZÁÉÍÓÚÑa-záéíóúñ][A-ZÁÉÍÓÚÑa-záéíóúñ\s]+?)\s+DIANA CONSUELO BLANCO GARZ[ÓO]N",
+        r"y\s+([A-ZÁÉÍÓÚÑa-záéíóúñ][A-ZÁÉÍÓÚÑa-záéíóúñ\s]+?),\s*mayor de edad",
+        r"quien en adelante se denominar[áa]\s+EL CONTRATISTA.*?por la otra,\s*([A-ZÁÉÍÓÚÑa-záéíóúñ][A-ZÁÉÍÓÚÑa-záéíóúñ\s]+?),",
     ]
     m = search_first(patterns, text)
     if m:
@@ -85,6 +87,8 @@ def extract_contract_type(text: str) -> str:
     desde el encabezado principal o desde menciones explícitas en el cuerpo.
     """
     patterns = [
+        r"tipo\s+de\s+contrato\s*[:\-]\s*([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{4,80})",
+        r"CONTRATO\s+DE\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s]{4,120}?)\s+No\.?",
         r"CONTRATO\s+DE\s+([A-ZÁÉÍÓÚÑ\s]+?)\s+No\.?",
         r"presente\s+contrato\s+de\s+([A-ZÁÉÍÓÚÑ\s]+?)(?:\s+el\s+cual|\s+que\s+se\s+regir[áa]|\s+conforme)",
     ]
@@ -94,6 +98,7 @@ def extract_contract_type(text: str) -> str:
         return ""
 
     contract_type = re.sub(r"\s+", " ", m.group(1)).strip(" ,.;:\n\t")
+    contract_type = re.sub(r"\b(CELEBRADO|SUSCRITO|ENTRE)\b.*$", "", contract_type, flags=re.IGNORECASE).strip()
     return contract_type.upper()
 
 
@@ -182,12 +187,18 @@ def extract_obligaciones_especificas(text: str) -> str:
     start_patterns = [
         r"B\)\s*OBLIGACIONES\s+ESPEC[ÍI]FICAS\s*:\s*A\s*EL\s+CONTRATISTA\s+le\s+corresponde\s+el\s+cumplimiento\s+de\s+las\s+siguientes\s+obligaciones\s*:",
         r"B\)\s*OBLIGACIONES\s+ESPEC[ÍI]FICAS\s*:",
+        r"\d+\.\s*OBLIGACIONES\s+ESPEC[ÍI]FICAS\s*:",
+        r"CL[ÁA]USULA\s+SEGUNDA\s*[:\-]\s*OBLIGACIONES\s+ESPEC[ÍI]FICAS\s*",
         r"OBLIGACIONES\s+ESPEC[ÍI]FICAS\s*:",
     ]
     end_patterns = [
         r"CL[ÁA]USULA\s+TERCERA\s*:",
+        r"CL[ÁA]USULA\s+CUARTA\s*:",
+        r"CL[ÁA]USULA\s+QUINTA\s*:",
         r"C\)\s*OBLIGACIONES\s+DE\s+LA\s+CONTRATANTE",
         r"OBLIGACIONES\s+DE\s+LA\s+CONTRATANTE",
+        r"PLAZO\s+DE\s+EJECUCI[ÓO]N",
+        r"VALOR\s+DEL\s+CONTRATO",
     ]
 
     start_match = search_first(start_patterns, text)
