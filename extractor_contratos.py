@@ -3,6 +3,7 @@ import argparse
 import re
 import sys
 import zipfile
+from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -259,8 +260,18 @@ def run_extraction(input_zip_path: Path, include_nested_zips: bool = False) -> P
     df = pd.DataFrame(data)
 
     output_excel_path = input_zip_path.parent / "contratos_extraidos.xlsx"
-    df.to_excel(output_excel_path, index=False)
-    return output_excel_path
+    try:
+        df.to_excel(output_excel_path, index=False)
+        return output_excel_path
+    except PermissionError:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        fallback_excel_path = input_zip_path.parent / f"contratos_extraidos_{timestamp}.xlsx"
+        df.to_excel(fallback_excel_path, index=False)
+        return fallback_excel_path
+    except (ImportError, ModuleNotFoundError):
+        output_csv_path = input_zip_path.parent / "contratos_extraidos.csv"
+        df.to_csv(output_csv_path, index=False, encoding="utf-8-sig")
+        return output_csv_path
 
 
 if __name__ == "__main__":
