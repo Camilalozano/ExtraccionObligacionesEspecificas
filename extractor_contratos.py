@@ -2,7 +2,6 @@ import io
 import argparse
 import re
 import sys
-import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -224,52 +223,46 @@ def process_single_pdf(pdf_bytes: bytes, filename: str) -> Dict:
     return result
 
 
-def process_zip(zip_bytes: bytes, include_nested_zips: bool = False) -> List[Dict]:
+def process_directory(input_dir: Path) -> List[Dict]:
     results = []
-    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-        for name in zf.namelist():
-            if name.endswith("/"):
-                continue
-            if not name.lower().endswith(".pdf"):
-                continue
-
-            file_bytes = zf.read(name)
-            try:
-                results.append(process_single_pdf(file_bytes, name))
-            except Exception as e:
-                results.append(
-                    {
-                        "archivo": Path(name).name,
-                        "numero_contrato": "",
-                        "Tipo_contrato": "",
-                        "nombre_contratista": "",
-                        "numero_documento_contratista": "",
-                        "obligaciones_especificas": "",
-                        "error": str(e),
-                    }
-                )
+    pdf_files = sorted(input_dir.rglob("*.pdf"))
+    for pdf_path in pdf_files:
+        try:
+            file_bytes = pdf_path.read_bytes()
+            results.append(process_single_pdf(file_bytes, str(pdf_path)))
+        except Exception as e:
+            results.append(
+                {
+                    "archivo": pdf_path.name,
+                    "numero_contrato": "",
+                    "Tipo_contrato": "",
+                    "nombre_contratista": "",
+                    "numero_documento_contratista": "",
+                    "obligaciones_especificas": "",
+                    "error": str(e),
+                }
+            )
     return results
 
 
-def run_extraction(input_zip_path: Path, include_nested_zips: bool = False) -> Path:
-    if not input_zip_path.exists() or not input_zip_path.is_file():
-        raise FileNotFoundError(f"No se encontró el archivo ZIP: {input_zip_path}")
+def run_extraction(input_dir_path: Path) -> Path:
+    if not input_dir_path.exists() or not input_dir_path.is_dir():
+        raise FileNotFoundError(f"No se encontró la carpeta de entrada: {input_dir_path}")
 
-    zip_bytes = input_zip_path.read_bytes()
-    data = process_zip(zip_bytes, include_nested_zips=include_nested_zips)
+    data = process_directory(input_dir_path)
     df = pd.DataFrame(data)
 
-    output_excel_path = input_zip_path.parent / "contratos_extraidos.xlsx"
+    output_excel_path = input_dir_path / "contratos_extraidos.xlsx"
     try:
         df.to_excel(output_excel_path, index=False)
         return output_excel_path
     except PermissionError:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        fallback_excel_path = input_zip_path.parent / f"contratos_extraidos_{timestamp}.xlsx"
+        fallback_excel_path = input_dir_path / f"contratos_extraidos_{timestamp}.xlsx"
         df.to_excel(fallback_excel_path, index=False)
         return fallback_excel_path
     except (ImportError, ModuleNotFoundError):
-        output_csv_path = input_zip_path.parent / "contratos_extraidos.csv"
+        output_csv_path = input_dir_path / "contratos_extraidos.csv"
         df.to_csv(output_csv_path, index=False, encoding="utf-8-sig")
         return output_csv_path
 
@@ -277,19 +270,14 @@ def run_extraction(input_zip_path: Path, include_nested_zips: bool = False) -> P
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=(
-            "Extrae contratos en PDF desde un ZIP y exporta resultados a Excel. "
-            "Por defecto solo procesa PDFs en el ZIP principal para evitar mezclar anexos."
+            "Extrae contratos en PDF desde una carpeta (incluye subcarpetas) "
+            "y exporta resultados a Excel."
         )
     )
-    parser.add_argument("input_zip", help="Ruta del archivo ZIP de entrada.")
-    parser.add_argument(
-        "--include-nested-zips",
-        action="store_true",
-        help="Si se activa, también procesa PDFs dentro de ZIPs anidados.",
-    )
+    parser.add_argument("input_dir", help="Ruta de la carpeta que contiene los PDFs.")
 
     args = parser.parse_args(sys.argv[1:])
 
-    input_zip = Path(args.input_zip)
-    output_excel = run_extraction(input_zip, include_nested_zips=args.include_nested_zips)
+    input_dir = Path(args.input_dir)
+    output_excel = run_extraction(input_dir)
     print(f"✅ Excel generado en: {output_excel}")
