@@ -225,41 +225,28 @@ def process_single_pdf(pdf_bytes: bytes, filename: str) -> Dict:
 
 def process_zip(zip_bytes: bytes, include_nested_zips: bool = False) -> List[Dict]:
     results = []
-    pdf_header = b"%PDF-"
-
-    def _is_pdf_file(filename: str, content: bytes) -> bool:
-        lower_name = filename.lower()
-        return lower_name.endswith(".pdf") or content.lstrip().startswith(pdf_header)
-
-    def _process_zip_obj(zf: zipfile.ZipFile) -> None:
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
         for name in zf.namelist():
-            lower_name = name.lower()
             if name.endswith("/"):
-                # Es un directorio dentro del ZIP, no se procesa directamente.
+                continue
+            if not name.lower().endswith(".pdf"):
                 continue
 
             file_bytes = zf.read(name)
-            if _is_pdf_file(name, file_bytes):
-                try:
-                    results.append(process_single_pdf(file_bytes, name))
-                except Exception as e:
-                    results.append(
-                        {
-                            "archivo": Path(name).name,
-                            "numero_contrato": "",
-                            "Tipo_contrato": "",
-                            "nombre_contratista": "",
-                            "numero_documento_contratista": "",
-                            "obligaciones_especificas": "",
-                            "error": str(e),
-                        }
-                    )
-            elif include_nested_zips and lower_name.endswith(".zip"):
-                with zipfile.ZipFile(io.BytesIO(file_bytes)) as nested_zip:
-                    _process_zip_obj(nested_zip)
-
-    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-        _process_zip_obj(zf)
+            try:
+                results.append(process_single_pdf(file_bytes, name))
+            except Exception as e:
+                results.append(
+                    {
+                        "archivo": Path(name).name,
+                        "numero_contrato": "",
+                        "Tipo_contrato": "",
+                        "nombre_contratista": "",
+                        "numero_documento_contratista": "",
+                        "obligaciones_especificas": "",
+                        "error": str(e),
+                    }
+                )
     return results
 
 
