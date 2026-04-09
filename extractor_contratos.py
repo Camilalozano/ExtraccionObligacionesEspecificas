@@ -224,24 +224,33 @@ def process_single_pdf(pdf_bytes: bytes, filename: str) -> Dict:
 
 def process_zip(zip_bytes: bytes) -> List[Dict]:
     results = []
+    def _process_zip_obj(zf: zipfile.ZipFile) -> None:
+        for name in zf.namelist():
+            lower_name = name.lower()
+            if lower_name.endswith(".pdf"):
+                pdf_bytes = zf.read(name)
+                try:
+                    results.append(process_single_pdf(pdf_bytes, name))
+                except Exception as e:
+                    results.append(
+                        {
+                            "archivo": Path(name).name,
+                            "numero_contrato": "",
+                            "Tipo_contrato": "",
+                            "nombre_contratista": "",
+                            "numero_documento_contratista": "",
+                            "obligaciones_especificas": "",
+                            "error": str(e),
+                        }
+                    )
+            elif lower_name.endswith(".zip"):
+                with zf.open(name) as nested_file:
+                    nested_bytes = nested_file.read()
+                    with zipfile.ZipFile(io.BytesIO(nested_bytes)) as nested_zip:
+                        _process_zip_obj(nested_zip)
+
     with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
-        pdf_files = [name for name in zf.namelist() if name.lower().endswith(".pdf")]
-        for name in pdf_files:
-            pdf_bytes = zf.read(name)
-            try:
-                results.append(process_single_pdf(pdf_bytes, name))
-            except Exception as e:
-                results.append(
-                    {
-                        "archivo": Path(name).name,
-                        "numero_contrato": "",
-                        "Tipo_contrato": "",
-                        "nombre_contratista": "",
-                        "numero_documento_contratista": "",
-                        "obligaciones_especificas": "",
-                        "error": str(e),
-                    }
-                )
+        _process_zip_obj(zf)
     return results
 
 
