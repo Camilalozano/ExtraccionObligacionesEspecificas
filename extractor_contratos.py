@@ -16,7 +16,7 @@ from pypdf import PdfReader
 
 def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
     """Extrae todo el texto de un PDF usando pypdf."""
-    reader = PdfReader(io.BytesIO(pdf_bytes))
+    reader = PdfReader(io.BytesIO(pdf_bytes), strict=False)
     pages = []
     for page in reader.pages:
         try:
@@ -24,6 +24,42 @@ def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
         except Exception:
             pages.append("")
     return "\n".join(pages)
+
+
+
+
+def detect_file_signature(file_bytes: bytes) -> str:
+    """Detecta firmas comunes para validar que el archivo sea PDF real."""
+    if file_bytes.startswith(b"%PDF-"):
+        return "pdf"
+    if file_bytes.startswith(b"PK\x03\x04"):
+        return "zip"
+    if file_bytes.startswith(b"\xd0\xcf\x11\xe0"):
+        return "ole"
+    return "unknown"
+
+
+def validate_pdf_bytes(file_bytes: bytes, filename: str) -> None:
+    """Lanza un error claro si el archivo no tiene firma de PDF."""
+    signature = detect_file_signature(file_bytes)
+    if signature == "pdf":
+        return
+
+    if signature == "zip":
+        raise ValueError(
+            f"El archivo no es un PDF válido (firma ZIP/Office): {Path(filename).name}. "
+            "Revisa la extensión real del archivo."
+        )
+
+    if signature == "ole":
+        raise ValueError(
+            f"El archivo no es un PDF válido (firma Office antigua): {Path(filename).name}. "
+            "Revisa la extensión real del archivo."
+        )
+
+    raise ValueError(
+        f"El archivo no parece PDF (firma desconocida): {Path(filename).name}."
+    )
 
 
 def normalize_text(text: str) -> str:
@@ -229,6 +265,7 @@ def process_directory(input_dir: Path) -> List[Dict]:
     for pdf_path in pdf_files:
         try:
             file_bytes = pdf_path.read_bytes()
+            validate_pdf_bytes(file_bytes, str(pdf_path))
             results.append(process_single_pdf(file_bytes, str(pdf_path)))
         except Exception as e:
             results.append(
