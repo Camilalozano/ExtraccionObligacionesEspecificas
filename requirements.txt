@@ -1,3 +1,5 @@
 streamlit
-pypdf
 pandas
+pypdf
+openai>=1.0.0
+openpyxl
